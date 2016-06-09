@@ -1,0 +1,130 @@
+---
+title: "p2_mock"
+output: html_document
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE} 
+library(dplyr)
+library(plotly)
+library(lubridate)
+
+setwd("/Users/amywang/Documents/healthe_mock/data/")
+p2_real_data <- read.csv("P2_real.csv", stringsAsFactors=FALSE)
+
+# Turning the data into a readable date, organizing by more time columns (hour, day, month, minute)
+p2_real_data <- mutate(p2_real_data, readable_date = 
+                              as.POSIXct(date, format = "%m/%d/%Y %I:%M:%S %p"))
+p2_real_data <- mutate(p2_real_data, hour = hour(readable_date))
+p2_real_data <- mutate(p2_real_data, day = day(readable_date))
+p2_real_data <- mutate(p2_real_data, month = month(readable_date))
+p2_real_data <- mutate(p2_real_data, minute = minute(readable_date))
+
+# Created mock data set based off of p2 with some noise (current can vary 10 units from real data)
+p2_mock_data <- p2_real_data[complete.cases(p2_real_data),]
+p2_mock_data <- mutate(p2_mock_data, rand = round(runif(nrow(p2_mock_data), min = -10, max = 10)))
+p2_mock_data <- mutate(p2_mock_data, mock_recorded = recorded + rand)
+
+# Making mock data from real data from April, summarizing it in a new df to get the average luminocity
+# for each hour in the month by adding the recorded luminocity up from each hour and dividing by the total
+# times the sensor recorded in the hour in the month. 
+# The summary table gives the user an idea of their average day for the month, and then can compare to other
+# months if needed. 
+p2_mock_data <- select(p2_mock_data, sensor, recorded, readable_date, minute, hour, day, month, mock_recorded, rand)
+p2_mock_summary <- group_by(p2_mock_data, hour) %>%
+  summarise(luminocity_by_hour = sum(mock_recorded))
+a <- table(p2_mock_data$hour)
+p2_mock_summary <- mutate(p2_mock_summary, freq = a)
+p2_mock_summary <- mutate(p2_mock_summary, mean = (luminocity_by_hour/freq))
+
+# Repeat month 4, creating a month 1
+p2_mock_data_1 <- p2_mock_data
+p2_mock_data_1$month <- 1
+p2_mock_data_1 <- mutate(p2_mock_data_1, rand = round(runif(nrow(p2_mock_data_1), min = -10, max = 10)))
+p2_mock_data_1 <- mutate(p2_mock_data_1, mock_recorded = recorded + rand)
+month(p2_mock_data_1$readable_date) <- 1
+p2_mock_1summary <- group_by(p2_mock_data_1, hour) %>%
+  summarise(luminocity_by_hour = sum(mock_recorded))
+b <- table(p2_mock_data_1$hour)
+p2_mock_1summary <- mutate(p2_mock_1summary, freq = a)
+p2_mock_1summary <- mutate(p2_mock_1summary, mean = (luminocity_by_hour/freq))
+
+# Repeat month 4, creating a month 2
+p2_mock_data_2 <- p2_mock_data
+p2_mock_data_2$month <- 2
+p2_mock_data_2 <- mutate(p2_mock_data_2, rand = round(runif(nrow(p2_mock_data), min = -10, max = 10)))
+p2_mock_data_2 <- mutate(p2_mock_data_2, mock_recorded = recorded + rand)
+month(p2_mock_data_2$readable_date) <- 2
+p2_mock_2summary <- group_by(p2_mock_data_2, hour) %>%
+  summarise(luminocity_by_hour = sum(mock_recorded))
+b <- table(p2_mock_data_2$hour)
+p2_mock_2summary <- mutate(p2_mock_2summary, freq = a)
+p2_mock_2summary <- mutate(p2_mock_2summary, mean = (luminocity_by_hour/freq))
+
+# Repeat month 4, creating a month 3 - noise centered to be drastically below real data
+p2_mock_data_3 <- p2_mock_data
+p2_mock_data_3$month <- 3
+p2_mock_data_3 <- mutate(p2_mock_data_3, rand = round(runif(nrow(p2_mock_data), min = -50, max = 0)))
+p2_mock_data_3 <- mutate(p2_mock_data_3, mock_recorded = recorded + rand)
+month(p2_mock_data_3$readable_date) <- 3
+p2_mock_3summary <- group_by(p2_mock_data_3, hour) %>%
+  summarise(luminocity_by_hour = sum(mock_recorded))
+b <- table(p2_mock_data_3$hour)
+p2_mock_3summary <- mutate(p2_mock_3summary, freq = a)
+p2_mock_3summary <- mutate(p2_mock_3summary, mean = (luminocity_by_hour/freq))
+
+# Total df containing all of the data from all 4 months
+p2_total_mock <- rbind(p2_mock_data_1, p2_mock_data_2, p2_mock_data_3, p2_mock_data)
+```
+
+# Month 1
+```{r, echo = FALSE, message = FALSE, warning = FALSE} 
+plot_ly(p2_mock_1summary, 
+        x = hour, 
+        y = mean,
+        name = "average luminocity per hour") %>%
+   add_trace(y = fitted(loess(mean ~ hour)),
+            name = "local regression")%>%
+  layout(title = "Mock Data Based on P2: Month 1")
+```
+
+# Month 2
+```{r, echo = FALSE, message = FALSE, warning = FALSE} 
+plot_ly(p2_mock_2summary, 
+        x = hour, 
+        y = mean,
+        name = "average luminocity per hour") %>%
+   add_trace(y = fitted(loess(mean ~ hour)),
+            name = "local regression")%>%
+  layout(title = "Mock Data Based on P2: Month 2")
+```
+
+# Month 3
+```{r, echo = FALSE, message = FALSE, warning = FALSE} 
+plot_ly(p2_mock_3summary, 
+        x = hour, 
+        y = mean,
+        name = "average luminocity per hour") %>%
+   add_trace(y = fitted(loess(mean ~ hour)),
+            name = "local regression")%>%
+  layout(title = "Mock Data Based on P2: Month 3")
+```
+
+# Month 4
+```{r, echo = FALSE, message = FALSE, warning = FALSE} 
+plot_ly(p2_mock_summary, 
+        x = hour, 
+        y = mean,
+        name = "average luminocity per hour") %>%
+   add_trace(y = fitted(loess(mean ~ hour)),
+            name = "local regression")%>%
+  layout(title = "Mock Data Based on P2: Month 4")
+```
+
+# Total Data
+```{r, echo = FALSE, message = FALSE, warning = FALSE} 
+plot_ly(p2_total_mock, 
+        x = readable_date, 
+        y = mock_recorded) %>%
+  layout(title = "Total Mock Data based on P2")
+
+```
